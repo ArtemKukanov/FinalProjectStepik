@@ -1,0 +1,97 @@
+Проект написан на Python и представляет древовидную структуру. Есть следующие файлы: 
+
+Файл test_main_page.py:
+import pytest
+from selenium import webdriver
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+import time
+from .pages.main_page import MainPage
+def test_guest_can_go_to_login_page(browser):
+    link = "http://selenium1py.pythonanywhere.com/"
+    page = MainPage(browser, link)   # инициализируем Page Object, передаем в конструктор экземпляр драйвера и url адрес 
+    page.open()                      # открываем страницу
+    page.go_to_login_page()          # выполняем метод страницы — переходим на страницу логина
+def test_guest_should_see_login_link(browser):
+    link = "http://selenium1py.pythonanywhere.com/"
+    page = MainPage(browser, link)
+    page.open()
+    page.should_be_login_link()
+
+
+Файл conftest.py:
+import pytest
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.chrome.options import Options
+def pytest_addoption(parser):
+    parser.addoption('--language', action='store', default='en', help="Choose language") # новая опция --language
+@pytest.fixture(scope="function")
+def browser(request):
+    browser_language = request.config.getoption("language")
+    options = Options()
+    options.add_argument(f"--lang={browser_language}")
+    options.add_experimental_option('prefs', {'intl.accept_languages': browser_language})
+    print(f"\nstart browser for test with language={browser_language}")
+    browser = webdriver.Chrome(options=options)
+    yield browser
+    print("\nquit browser..")
+    browser.quit()
+
+
+Папка pages, файл main_page.py
+from .base_page import BasePage
+from .locators import MainPageLocators
+class MainPage(BasePage): # MainPage наследник класса BasePage
+    def go_to_login_page(self):
+        login_link = self.browser.find_element(*MainPageLocators.LOGIN_LINK)
+        login_link.click()
+    def should_be_login_link(self): 
+        assert self.is_element_present(*MainPageLocators.LOGIN_LINK), "Login link is not presented"
+
+
+Папка pages, файл login_page.py
+from .base_page import BasePage
+from .locators import LoginPageLocators
+class LoginPage(BasePage):
+    def should_be_login_page(self):
+        self.should_be_login_url()
+        self.should_be_login_form()
+        self.should_be_register_form()
+    def should_be_login_url(self):
+        # реализуйте проверку на корректный url адрес
+        "login" in self.browser.current_url, "Некорректный url"
+    def should_be_login_form(self):
+        # реализуйте проверку, что есть форма логина
+        assert self.is_element_present(*LoginPageLocators.LOGIN_FORM), "Формы входа нет"
+    def should_be_register_form(self):
+        # реализуйте проверку, что есть форма регистрации на странице
+        assert self.is_element_present(*LoginPageLocators.REGISTER_FORM), "Формы регистрации нет"
+
+
+Папка pages, файл locators.py
+from selenium.webdriver.common.by import By
+class MainPageLocators():
+    LOGIN_LINK = (By.CSS_SELECTOR, "#login_link")
+class LoginPageLocators():
+    LOGIN_FORM = (By.CSS_SELECTOR, "#login_form")
+    REGISTER_FORM = (By.CSS_SELECTOR, "#register_form")
+
+
+Папка pages, файл base_page.py
+from selenium.common.exceptions import NoSuchElementException
+class BasePage():
+    def __init__(self, browser, url, timeout=10):
+        # Конструктор класса
+        self.browser = browser
+        self.url = url
+        self.browser.implicitly_wait(timeout)
+    def open(self):
+        # метод open открывает нужную страницу
+        self.browser.get(self.url)
+    def is_element_present(self, how, what):
+        try:
+            self.browser.find_element(how, what)
+        except (NoSuchElementException):
+            return False
+        return True
