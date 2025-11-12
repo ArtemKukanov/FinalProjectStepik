@@ -26,6 +26,3 @@ class ProductPage(BasePage):
     """Функция, что ненужного сообщения об успехе нет"""
     def should_not_be_success_message(self):
         assert self.is_not_element_present(*ProductPageLocators.SUCSSESEFUL_MESSAGE), "Есть сообщение об успехе, хотя его быть не должно"
-
-    def should_disappear(self):
-        assert self.is_disappeared(*ProductPageLocators.SUCSSESEFUL_MESSAGE), "Сообщение об успехе должно исчезнуть, а оно есть"
