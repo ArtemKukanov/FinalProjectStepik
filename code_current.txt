@@ -1,5 +1,54 @@
 Проект написан на Python и представляет древовидную структуру. Есть следующие файлы: 
 
+Файл test_product_page.py:
+import pytest
+from selenium import webdriver
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from .pages.product_page import ProductPage
+"""Тест на возможность положить товар в корзину"""
+"""Параметризация запуска"""
+@pytest.mark.parametrize('link', ["http://selenium1py.pythonanywhere.com/catalogue/coders-at-work_207/?promo=offer0",
+                                  "http://selenium1py.pythonanywhere.com/catalogue/coders-at-work_207/?promo=offer1",
+                                  "http://selenium1py.pythonanywhere.com/catalogue/coders-at-work_207/?promo=offer2",
+                                  "http://selenium1py.pythonanywhere.com/catalogue/coders-at-work_207/?promo=offer3",
+                                  "http://selenium1py.pythonanywhere.com/catalogue/coders-at-work_207/?promo=offer4",
+                                  "http://selenium1py.pythonanywhere.com/catalogue/coders-at-work_207/?promo=offer5",
+                                  "http://selenium1py.pythonanywhere.com/catalogue/coders-at-work_207/?promo=offer6",
+                                  pytest.param("http://selenium1py.pythonanywhere.com/catalogue/coders-at-work_207/?promo=offer7", marks=pytest.mark.xfail), # marks=pytest.mark.xfail -- параметр помечается как ожидающий сбой (xfail — expected failure)
+                                  "http://selenium1py.pythonanywhere.com/catalogue/coders-at-work_207/?promo=offer8",
+                                  "http://selenium1py.pythonanywhere.com/catalogue/coders-at-work_207/?promo=offer9"])
+def test_guest_can_add_product_to_basket(browser, link):
+    page = ProductPage(browser, link) # создается объект page, принадлежащий классу ProductPage (ProductPage -- наследник BasePage), page принимает все "def" из ProductPage в product_page.py
+    page.open() # страница (page) открывается с помощью функции (def open) принадлежащей классу BasePage, описанному в base_page.py (но технически def open принадлежит и дочернему классу ProductPage)
+    page.add_product_to_basket() # тестоввый метод add_product_to_basket производит действия над page
+    page.solve_quiz_and_get_code() # тестоввый метод solve_quiz_and_get_code производит действия над page
+    page.verification__product_name() # тестоввый метод verification__product_name производит действия над page
+    page.verification__product_price() # тестоввый метод verification__product_price производит действия над page
+"""Тест на невозможность увидеть ненужное сообщение после добавления товара в корзину"""
+def test_guest_cant_see_success_message_after_adding_product_to_basket(browser):
+    link = "http://selenium1py.pythonanywhere.com/catalogue/coders-at-work_207/" # рекомендация из урока https://stepik.org/lesson/201964/step/6?unit=176022 (комментарии)
+    page = ProductPage(browser, link) # объяснение в test_guest_can_add_product_to_basket
+    page.open() # объяснение в test_guest_can_add_product_to_basket
+    page.add_product_to_basket() # объяснение в test_guest_can_add_product_to_basket
+    page.solve_quiz_and_get_code() # объяснение в test_guest_can_add_product_to_basket
+    page.should_not_be_success_message() # Тестовый метод should_not_be_success_message производит действия над page -- смотрит что ненужного сообщения об успехе нет
+"""Тест на невозможность увидеть ненужное сообщение до добавления товара в корзину (сразу после перехода на сайт)"""
+def test_guest_cant_see_success_message(browser):
+    link = "http://selenium1py.pythonanywhere.com/catalogue/coders-at-work_207/"
+    page = ProductPage(browser, link)
+    page.open()
+    page.should_not_be_success_message()
+"""Тест на то, что сообщение исчезает после добавления товара в корзину"""
+def test_message_disappeared_after_adding_product_to_basket(browser):
+    link = "http://selenium1py.pythonanywhere.com/catalogue/coders-at-work_207/"
+    page = ProductPage(browser, link)
+    page.open()
+    page.add_product_to_basket()
+    page.solve_quiz_and_get_code()
+    page.is_disappeared()
+
+
 Файл test_main_page.py:
 import pytest
 from selenium import webdriver
@@ -7,16 +56,19 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 import time
 from .pages.main_page import MainPage
-def test_guest_can_go_to_login_page(browser):
-    link = "http://selenium1py.pythonanywhere.com/"
-    page = MainPage(browser, link)   # инициализируем Page Object, передаем в конструктор экземпляр драйвера и url адрес 
-    page.open()                      # открываем страницу
-    page.go_to_login_page()          # выполняем метод страницы — переходим на страницу логина
+from .pages.login_page import LoginPage
 def test_guest_should_see_login_link(browser):
     link = "http://selenium1py.pythonanywhere.com/"
     page = MainPage(browser, link)
     page.open()
     page.should_be_login_link()
+def test_guest_can_go_to_login_page(browser):
+    link = "http://selenium1py.pythonanywhere.com"
+    page = MainPage(browser, link)
+    page.open()
+    page.go_to_login_page()
+    login_page = LoginPage(browser, browser.current_url)
+    login_page.should_be_login_page()
 
 
 Файл conftest.py:
@@ -24,29 +76,59 @@ import pytest
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
-def pytest_addoption(parser):
+def pytest_addoption(parser): # hook-функция PyTest, вызывается при инициализации pytest (это и есть конфигурация PyTest)
     parser.addoption('--language', action='store', default='en', help="Choose language") # новая опция --language
-@pytest.fixture(scope="function")
-def browser(request):
-    browser_language = request.config.getoption("language")
-    options = Options()
-    options.add_argument(f"--lang={browser_language}")
+@pytest.fixture(scope="function") # декоратор/фикстура - настраивает браузер на уровне функции
+def browser(request): # обявляем функцию browser в рамках фикстуры (то есть это отдельный объект, который создается и управляется pytest с областью видимости function)
+    browser_language = request.config.getoption("language") # считывается значение опции `--language` из конфигурации pytest в addoption
+    options = Options() # создается объект настроек для Chrome
+    options.add_argument(f"--lang={browser_language}") # в аргументы запуска Chrome, передается параметр `--lang=код_языка`
     options.add_experimental_option('prefs', {'intl.accept_languages': browser_language})
     print(f"\nstart browser for test with language={browser_language}")
-    browser = webdriver.Chrome(options=options)
-    yield browser
+    browser = webdriver.Chrome(options=options) # Условно: вызови конструктор Chrome, передай туда настройки браузера, которые содержатся в переменной `options`
+    yield browser # останавливается работа браузера и сохраняется его локальное состояние 
     print("\nquit browser..")
-    browser.quit()
+    browser.quit() # выход из браузера
+
+
+Папка pages, файл product_page.py
+from .base_page import BasePage
+from .locators import ProductPageLocators
+class ProductPage(BasePage):
+    def add_product_to_basket(self):
+        add_btn = self.browser.find_element(*ProductPageLocators.ADD_TO_BASKET)
+        add_btn.click()
+    """Функция сравнения названий продукта на странице и в алерте"""
+    def verification__product_name(self):
+        assert self.browser.find_element(*ProductPageLocators.PRODUCT_NAME), "названия продукта нет на странице" # узнаем есть ли вообще название продукта на странице
+        assert self.browser.find_element(*ProductPageLocators.ALERT_NAME), "названия продукта нет в алерте" # узнаем есть ли вообще название продукта в алерте
+        name_product_page = self.browser.find_element(*ProductPageLocators.PRODUCT_NAME).text # текст из селектора PRODUCT_NAME на странице
+        name_product_alert = self.browser.find_element(*ProductPageLocators.ALERT_NAME).text # текст из селектора PRODUCT_NAME из алерта
+        assert name_product_page == name_product_alert, "названия продукта не совпадают на странице и в алерте" # производим сравнение названий
+    """Функция сравнения цен продукта на странице и в алерте"""
+    def verification__product_price(self):
+        assert self.browser.find_element(*ProductPageLocators.PRODUCT_PRICE), "цены продукта нет на странице" # узнаем есть ли вообще цена продукта на странице
+        assert self.browser.find_element(*ProductPageLocators.ALERT_PRICE), "цены продукта нет в алерте" # узнаем есть ли вообще цена продукта в алерте
+        price_product_page = self.browser.find_element(*ProductPageLocators.PRODUCT_PRICE).text # текст из селектора PRODUCT_PRICE на странице
+        price_product_alert = self.browser.find_element(*ProductPageLocators.ALERT_PRICE).text # текст из селектора ALERT_PRICE из алерта
+        assert price_product_page == price_product_alert, "цены продукта не совпадают на странице и в алерте" # производим сравнение цен
+    """Функция, что ненужного сообщения об успехе нет"""
+    def should_not_be_success_message(self):
+        assert self.is_not_element_present(*ProductPageLocators.ALERT_NAME), "Есть сообщение об успехе, хотя его быть не должно"
+    def should_disappear(self):
+        assert self.is_disappeared(*ProductPageLocators.ALERT_NAME), "Сообщение должно об успехе исчезнуть, а оно есть"
 
 
 Папка pages, файл main_page.py
 from .base_page import BasePage
 from .locators import MainPageLocators
-class MainPage(BasePage): # MainPage наследник класса BasePage
+from .login_page import LoginPage
+class MainPage(BasePage):
     def go_to_login_page(self):
-        login_link = self.browser.find_element(*MainPageLocators.LOGIN_LINK)
-        login_link.click()
-    def should_be_login_link(self): 
+        link = self.browser.find_element(*MainPageLocators.LOGIN_LINK)
+        link.click()
+        # return LoginPage(browser=self.browser, url=self.browser.current_url)
+    def should_be_login_link(self):
         assert self.is_element_present(*MainPageLocators.LOGIN_LINK), "Login link is not presented"
 
 
@@ -71,27 +153,71 @@ class LoginPage(BasePage):
 
 Папка pages, файл locators.py
 from selenium.webdriver.common.by import By
+"""Класс локаторов, относящихся к URL логина"""
 class MainPageLocators():
     LOGIN_LINK = (By.CSS_SELECTOR, "#login_link")
+"""Класс локаторов, относящихся к странице регистрации"""
 class LoginPageLocators():
     LOGIN_FORM = (By.CSS_SELECTOR, "#login_form")
     REGISTER_FORM = (By.CSS_SELECTOR, "#register_form")
+"""Класс локаторов, относящихся к странице продукта"""
+class ProductPageLocators():
+    ADD_TO_BASKET = (By.CSS_SELECTOR, ".btn.btn-lg.btn-primary.btn-add-to-basket") # кнопка добавления товара в корзину
+    PRODUCT_NAME = (By.CSS_SELECTOR, ".col-sm-6 h1") # название со страницы
+    ALERT_NAME = (By.CSS_SELECTOR, "#messages .alert:nth-child(1) .alertinner strong") # название из алерта
+    PRODUCT_PRICE = (By.CSS_SELECTOR,"p.price_color") # цена из со страницы
+    ALERT_PRICE = (By.CSS_SELECTOR, "#messages .alert:nth-child(3) .alertinner strong") # цена из алерта
 
 
 Папка pages, файл base_page.py
 from selenium.common.exceptions import NoSuchElementException
+from selenium.common.exceptions import NoAlertPresentException
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.common.exceptions import TimeoutException
+from selenium.webdriver.support import expected_conditions as EC
+import math
 class BasePage():
+    """Метод инициализации"""
     def __init__(self, browser, url, timeout=10):
-        # Конструктор класса
         self.browser = browser
         self.url = url
         self.browser.implicitly_wait(timeout)
+    """Метод для получения страницы"""
     def open(self):
-        # метод open открывает нужную страницу
         self.browser.get(self.url)
+    """Метод проверяет, что элемент есть на странице"""
     def is_element_present(self, how, what):
         try:
             self.browser.find_element(how, what)
         except (NoSuchElementException):
             return False
+        return True    
+    """метод проверяет, что элемент не появляется на странице в течение заданного времени"""
+    def is_not_element_present(self, how, what, timeout=4):
+        try:
+            WebDriverWait(self.browser, timeout).until(EC.presence_of_element_located((how, what)))
+        except TimeoutException:
+            return True
+        return False
+    """Метод проверяет, что какой-то элемент исчезает -- и если исчезает, то следует воспользоваться явным ожиданием вместе с функцией until_not"""
+    def is_disappeared(self, how, what, timeout=4):
+        try:
+            WebDriverWait(self.browser, timeout, 1, TimeoutException).\
+                until_not(EC.presence_of_element_located((how, what)))
+        except TimeoutException:
+            return False
         return True
+    """Математическая функция"""
+    def solve_quiz_and_get_code(self):
+        alert = self.browser.switch_to.alert
+        x = alert.text.split(" ")[2]
+        answer = str(math.log(abs((12 * math.sin(float(x))))))
+        alert.send_keys(answer)
+        alert.accept()
+        try:
+            alert = self.browser.switch_to.alert
+            alert_text = alert.text
+            print(f"Your code: {alert_text}")
+            alert.accept()
+        except NoAlertPresentException:
+            print("No second alert presented")
