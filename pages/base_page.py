@@ -66,4 +66,8 @@ class BasePage():
     def go_to_basket(self):
         link = self.browser.find_element(*BasePageLocators.BTN_BASKET)
         link.click()
+
+    """Проверка, что пользователь залогинен"""
+    def should_be_authorized_user(self):
+        assert self.is_element_present(*BasePageLocators.USER_ICON), "User icon is not presented, probably unauthorised user"
  

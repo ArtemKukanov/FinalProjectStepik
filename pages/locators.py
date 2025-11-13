@@ -8,6 +8,10 @@ class MainPageLocators():
 class LoginPageLocators():
     LOGIN_FORM = (By.CSS_SELECTOR, "#login_form")
     REGISTER_FORM = (By.CSS_SELECTOR, "#register_form")
+    EMAIL_FIELD = (By.ID, "id_registration-email")
+    PASSWORD_FIELD = (By.ID, "id_registration-password1")
+    CONFIRM_PASSWORD_FIELD = (By.ID, "id_registration-password2")
+    REGISTRATION_BUTTON = (By.CSS_SELECTOR, "#register_form > button")
 
 """Класс локаторов, относящихся к странице продукта"""
 class ProductPageLocators():
@@ -25,3 +29,4 @@ class BasePageLocators():
     BTN_BASKET = (By.CSS_SELECTOR, ".btn-group > .btn.btn-default")
     BASKET_PRODUCTS = (By.CSS_SELECTOR, ".basket-items")
     MESSAGE_EMPTY_BASKET = (By.CSS_SELECTOR, "#content_inner p")
+    USER_ICON = (By.CSS_SELECTOR, ".icon-user")
